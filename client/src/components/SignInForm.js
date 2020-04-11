@@ -1,15 +1,20 @@
 import React,{Component} from 'react';
+import { Redirect } from 'react-router-dom';
 
 class SignInForm extends Component{
     API_URL = '/users/login';
+    ERROR_TIMEOUT = 7000;
     constructor(){
         super();
         this.state={
             currentUser: null,
             userData: {
                 email: "",
-                password: ""
-            }
+                password: "",
+                totp:""
+            },
+            errors: [],
+            messages: []
         }
     }
 
@@ -22,11 +27,51 @@ class SignInForm extends Component{
       });
     }
 
+
+    validateUser(){
+      const {email, password,totp} = this.state.userData;
+      let errors = [];
+      let valid = true;
+      if(email === ""){
+        errors.push('Please fill in the email!');
+        valid = false;
+      }
+      if(password === ""){
+        errors.push('Please fill in the password!');
+        valid = false;
+      }
+      if(totp === ""){
+        errors.push('Please fill in the time based one time password!');
+        valid = false;
+      }
+      this.setErrors(errors);
+      setTimeout(() => this.resetErrors(), this.ERROR_TIMEOUT);
+      return valid;
+    }
+
+    setErrors = errors => {
+      this.setState({ errors });
+    }
+  
+    resetErrors = () => {
+      this.setState({ errors: []});
+    }
+
+    showErrors = () => {
+      return this.state.errors.map((error, itemKey) => {
+        return (
+          <div style={{color:"red"}} className="alert alert-danger" key={itemKey}>
+            {error}
+          </div>
+        );
+      })
+    }
+
     async handleSubmit(e){
       e.preventDefault();
-      const { email, password } = this.state.userData;
-      if(email && password){
-        const data = {email, password};
+      const { email, password, totp} = this.state.userData;
+      if(this.validateUser()){
+        const data = {email, password, totp};
         try{
           const res = await fetch(this.API_URL, {
             method: "POST",
@@ -38,10 +83,23 @@ class SignInForm extends Component{
             body: JSON.stringify(data)
           });
           const json = await res.json();
+          console.log(json)
           if(json){
             localStorage.setItem("user", JSON.stringify(json));
+            console.log(json.totp)
+            console.log(this.state.userData.totp)
+            if(json.totp === this.state.userData.totp){
+              this.setState({
+                shouldRedirect: true
+              });
+            }else{
+              //console.log("The totps do not match")
+              this.setErrors(["The totps do not match"]);
+              console.log(this.state.userData.totp)
+            }
+           
           }else{
-            alert('not signed in');
+            this.setErrors(["Unauthorized: wrong username or password"]);
           }
         } catch (e){
           alert(e.toString());
@@ -49,9 +107,11 @@ class SignInForm extends Component{
       }
     }
 
+
     render(){
         return(
             <div className="FormCenter">
+              {this.showErrors()}
             <form className="FormFields" onSubmit={e => this.handleSubmit(e)}>
               <div className="FormField">
                 <label className="FormField__Label">E-mail:</label>
@@ -63,6 +123,7 @@ class SignInForm extends Component{
                 placeholder="Enter e-mail"
                 onChange={e => this.handleChange(e)}></input>
               </div>
+              
               <div className="FormField">
                 <label className="FormField__Label">Password:</label>
                 <input 
@@ -73,11 +134,22 @@ class SignInForm extends Component{
                 placeholder="Enter password"
                 onChange={e => this.handleChange(e)}></input>
               </div>
+              <div className="FormField">
+                <label className="FormField__Label">Enter token from CyberGuard:</label>
+                <input 
+                type="password" 
+                id="totp" 
+                value={this.state.userData.totp} 
+                className="FormField__Input" 
+                placeholder="Enter token"
+                onChange={e => this.handleChange(e)}></input>
+              </div>
 
               <div className="FormField">
-                <button className="FormField__SignInbtn" >Sign in</button>
+                <button className="FormField__SignInbtn" onClick={e => this.handleSubmit(e)}>Sign in</button>
               </div>
             </form>
+            {this.state.shouldRedirect ?  <Redirect to="/userauthenticated"/>:null}
           </div>
         )
     }

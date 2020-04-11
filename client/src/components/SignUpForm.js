@@ -3,6 +3,7 @@ import { Redirect } from 'react-router-dom';
 
 class SignUpForm extends Component{
   API_URL = '/users/register';
+  ERROR_TIMEOUT = 5000;
     constructor(){
       super();
       this.state={
@@ -13,8 +14,10 @@ class SignUpForm extends Component{
           lastname: "",
           email:"",
           password: "",
-          repassword:"",
-        }
+          repassword:""
+        },
+        errors:[],
+        messages:[]
       };
     }
     handleChange(e){
@@ -26,6 +29,82 @@ class SignUpForm extends Component{
       });
     }
 
+    validateUser(){
+      const {firstname,lastname,email,password,repassword} = this.state.userData;
+      let errors = [];
+      let valid = true;
+      if(email===""){
+        errors.push('Email must be filled out');
+        valid = false;
+      }
+      if(email.indexOf("@")===-1){
+        errors.push('Email must be valid');
+        valid = false;
+      }
+      if(password === ""){
+        errors.push('The password should be filled in');
+        valid = false;
+      }
+
+      if(password.length < 8){
+        errors.push('The password should be at least 8 characters long');
+        valid = false;
+      }
+      
+      if(repassword !== password){
+        errors.push('The passwords should match');
+        valid = false;
+      }
+      if(firstname===""){
+        errors.push('You must fill out your last name');
+        valid = false;
+      }
+      if(lastname===""){
+        errors.push('You must fill out your firstname');
+        valid = false;
+      }
+      this.setErrors(errors);
+      setTimeout(() => this.resetErrors(), this.ERROR_TIMEOUT);
+      return valid;
+    }
+
+    setErrors = errors => {
+      this.setState({ errors });
+    }
+  
+    resetErrors = () => {
+      this.setState({ errors: []});
+    }
+
+    showErrors = () => {
+      return this.state.errors.map((error, itemKey) => {
+        return (
+          <div style={{color:"red"}} className="alert alert-danger" key={itemKey}>
+            {error}
+          </div>
+        );
+      })
+    }
+
+    setMessages = messages => {
+      this.setState({ messages });
+      setTimeout(() => this.resetMessages(), this.ERROR_TIMEOUT);
+    }
+  
+    resetMessages = () => {
+      this.setState({ messages: []});
+    }
+  
+    showMessages = () => {
+      return this.state.messages.map((message, itemKey) => {
+        return (
+          <div className="alert alert-success" role="alert" key={itemKey}>
+            {message}
+          </div>
+        );
+      })
+    }
+
     async handleSubmit(e){
       e.preventDefault();
       const { 
@@ -35,9 +114,7 @@ class SignUpForm extends Component{
         password,
         repassword 
       } = this.state.userData;
-      if(firstname && lastname && repassword && 
-        email && password &&
-        (password === repassword)){
+      if(this.validateUser()){
         const data = { 
           firstname,
           lastname,
@@ -58,20 +135,25 @@ class SignUpForm extends Component{
           const json = await res.json();
           if(json){
             localStorage.setItem("user", JSON.stringify(json));
+            this.setMessages(["User successfully added!"]);
             this.setState({
               shouldRedirect: true
             });
           }else{
-            alert('account not created');
+            this.setErrors(json.err.errors.map(o => o.message));
           }
         } catch (e){
           alert(e.toString());
         }
       }
     }
+
+    
     render(){
         return(
             <div className="FormCenter">
+                {this.showErrors()}
+                {this.showMessages()}
             <form className="FormFields" onSubmit={e => this.handleSubmit(e)}>
               <div className="FormField">
                 <label className="FormField__Label">First Name:</label>
@@ -105,7 +187,7 @@ class SignUpForm extends Component{
               </div>
 
               <div className="FormField">
-                <button className="FormField__SignUpbtn">Sign up</button>
+                <button className="FormField__SignUpbtn" onClick={ e => this.handleSubmit(e)}>Sign up</button>
               </div>
             </form>
             {this.state.shouldRedirect ? <Redirect to="/qrcode"/>:null}
